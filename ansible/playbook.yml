@@ -1,0 +1,79 @@
+---
+- hosts: inetrouter 
+  become: true
+  tasks:
+  
+    - name: Install requires packages
+      apt:
+        name: ['iptables', 'iptables-persistent', 'knockd']
+        state: present
+        update_cache: yes
+        
+    - name: Set up NAT on inetRouter
+      template: 
+        src: "iptables_rules_{{ansible_hostname}}.ipv4"
+        dest: "/etc/iptables_rules.ipv4"
+        owner: root
+        group: root
+        mode: 0644  
+    
+    - name: restore iptables
+      shell: iptables-restore /etc/iptables_rules.ipv4 
+
+- hosts: inetRouter 
+  become: true
+  tasks:
+    - name: writes the /etc/default/knockd
+      template: src=templates/knockd.j2 dest=/etc/default/knockd mode=0400
+
+    - name: writes the knockd conf
+      template: src=templates/knockd.conf.j2 dest=/etc/knockd.conf mode=0640
+      
+    - name: restart knockd
+      service:
+        name: knockd
+        state: restarted
+        enabled: true  
+  
+       
+- hosts: all
+  become: true
+  tasks:
+    - name: install nginx centerServer
+      apt:
+        name: nginx
+        state: latest
+        update_cache: yes
+      when: (ansible_hostname == "centerServer")
+
+    - name: install knockd centerRouter
+      apt:
+        name: knockd
+        state: latest
+        update_cache: yes
+      when: (ansible_hostname == "centerRouter")
+
+    - name: add default gateway for centralRouter
+      template: 
+        src: 50-vagrant_{{ansible_hostname}}.yml
+        dest: /etc/netplan/50-vagrant.yaml
+        owner: root
+        group: root
+        mode: 0600        
+        
+    - name: set net.ipv4.ip_forward
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: "1"
+        sysctl_set: true
+        state: present
+        reload: true
+      when: (ansible_hostname != "centralServer")
+
+    - name: restart all hosts
+      reboot:
+        reboot_timeout: 600
+
+
+    
+    

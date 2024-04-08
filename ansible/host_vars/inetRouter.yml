@@ -1,0 +1,7 @@
+---
+
+interface: enp0s8
+port_sequence: 7000,9000,8000
+secure_ports: 22
+seq_timeout: 5
+cmd_timeout: 60
